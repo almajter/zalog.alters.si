@@ -1,126 +1,543 @@
 ---
 import { Image } from 'astro:assets'
-import { band, parking, slug, walls } from '../walls'
+import { band, bucket, buckets, id, parking, quarry, slug, walls } from '../walls'
+import { topoSvg } from '../topo'
 import '@fontsource/big-shoulders-display/800'
+import '@fontsource/big-shoulders-display/900'
 import '@fontsource/public-sans/400'
 import '@fontsource/public-sans/600'
+import hero from '../photos/utopija.jpg'
+
+
+const problems = walls.flatMap(w => w.problems)
+const graded = problems.filter(p => bucket(p.grade) >= 0)
+const counts = buckets.map((_, i) => graded.filter(p => bucket(p.grade) === i).length)
+const top = Math.max(...counts)
+const osm = (c: string) => { const [a, b] = c.split(', '); return `https://www.openstreetmap.org/?mlat=${a}&mlon=${b}#map=17/${a}/${b}` }
 ---
 
 <html lang="sl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Nenatančen vodniček Zaloga</title>
-  <script is:inline>navigator.serviceWorker?.register('/sw.js')</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Kamnolom mlinskih kamnov · nenatančen vodniček za balvane</title>
+  <meta name="description" content="Balvani v kamnolomu mlinskih kamnov pod Starim gradom nad Podgradom: stene, linije, ocene, opombe. Deluje tudi brez signala." />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="theme-color" content="#1d211e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 </head>
 <body>
-  <header>
-    <h1>Nenatančen vodniček Zaloga</h1>
-    <p class="sub">po <s>slabem</s> spominu</p>
-    <p>Linije so narisane na pamet, imena in ocene tudi.</p>
-    <button class="save" onclick="print()">Shrani PDF</button>
+  <header class="hero">
+    <Image class="hero-bg" src={hero} alt="" width={1200} widths={[700, 1200]} sizes="100vw" quality={40} loading="eager" />
+    <div class="hero-in">
+      <div class="top">
+        <img class="logo" src="/logo-dark.svg" alt="Zalog · kamnolom mlinskih kamnov" width="226" height="77" />
+        <span id="net" class="pill" hidden>brez signala · deluje iz spomina</span>
+      </div>
+      <p class="kicker">Nenatančen vodniček po <s>slabem</s> spominu</p>
+      <h1>Kamnolom<br />mlinskih kamnov</h1>
+      <p class="lede">Balvani na kremenovem peščenjaku pod Starim gradom nad Podgradom. Linije so narisane na pamet, imena in ocene tudi.</p>
+      <ul class="stats">
+        <li><b>{problems.filter(p => p.num).length}</b> linij</li>
+        <li><b>{walls.length}</b> sten</li>
+        <li><b>lahko–8c</b> razpon</li>
+        <li><b>350 m</b> od parkirišča</li>
+      </ul>
+      <div class="actions">
+        <a class="btn solid" href="#stene">Na stene</a>
+        <a class="btn" href="#kraj">Dostop in zgodovina</a>
+        <button class="btn" id="install" hidden>Namesti aplikacijo</button>
+        <button class="btn" onclick="print()">Shrani PDF</button>
+      </div>
+    </div>
   </header>
 
-  <section class="approach">
-    <h2>Dostop</h2>
-    <p class="links">
-      <span>Parkirišče <code>{parking}</code></span>
-      <a href="https://www.openstreetmap.org/?mlat=46.06178&mlon=14.63783#map=17/46.06178/14.63783">OpenStreetMap</a>
-      <a href={`https://www.google.com/maps?q=${parking}`}>Google Maps</a>
-    </p>
+  <nav class="bar" id="stene" aria-label="Stene in filtri">
+    <div class="bar-in">
+      <div class="jump">
+        {walls.map(w => <a href={`#${slug(w.name)}`}>{w.name}</a>)}
+      </div>
+      <button class="ftoggle" aria-expanded="false" aria-controls="filters">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        Filtri <span class="fcount" hidden></span>
+      </button>
+    </div>
+    <form class="filters" id="filters" onsubmit="return false">
+      <label class="search">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input type="search" name="q" placeholder="Išči ime, številko ali opombo …" autocomplete="off" />
+      </label>
+
+      <fieldset class="grades">
+        <legend>Ocena <output name="range">vse</output></legend>
+        <div class="hist" aria-hidden="true" data-buckets={JSON.stringify(buckets)}>
+          {counts.map((c, i) => <span data-b={i} style={`--h:${c / top}`} title={`${buckets[i]}: ${c}`}><i></i><em>{buckets[i]}</em></span>)}
+        </div>
+        <div class="dual">
+          <input type="range" name="lo" min="0" max={buckets.length - 1} value="0" aria-label="Najnižja ocena" />
+          <input type="range" name="hi" min="0" max={buckets.length - 1} value={buckets.length - 1} aria-label="Najvišja ocena" />
+        </div>
+      </fieldset>
+
+      <fieldset class="seg">
+        <legend>Moj seznam</legend>
+        <label><input type="radio" name="tick" value="" checked /><span>Vse</span></label>
+        <label><input type="radio" name="tick" value="todo" /><span>Še ne</span></label>
+        <label><input type="radio" name="tick" value="done" /><span>Opravljeno</span></label>
+        <label><input type="radio" name="tick" value="proj" /><span>Projekti</span></label>
+      </fieldset>
+
+      <fieldset class="seg">
+        <legend>Prikaži</legend>
+        <label><input type="checkbox" name="variants" checked /><span>Variante</span></label>
+        <label><input type="checkbox" name="named" /><span>Samo z imenom</span></label>
+      </fieldset>
+
+      <p class="summary"><span id="shown"></span> <button type="reset" class="link">Počisti filtre</button></p>
+      <p class="log" id="log"></p>
+    </form>
+  </nav>
+
+  <main>
+    {walls.map(wall => (
+      <section class="wall" id={slug(wall.name)} data-wall>
+        <figure class="topo-wrap">
+          <div class="ph" style={`aspect-ratio:${wall.photo.width}/${wall.photo.height};--ar:${(wall.photo.width / wall.photo.height).toFixed(4)}`}>
+            <Image src={wall.photo} alt={`Stena ${wall.name} z vrisanimi linijami`} width={1100} widths={[640, 1100]} quality={62} sizes="(max-width: 860px) 100vw, 50vw" />
+            <Fragment set:html={topoSvg(wall)} />
+          </div>
+          <figcaption>
+            <button class="mini zoom" type="button">Povečaj</button>
+            <a class="mini" href={`/topo/${slug(wall.name)}.jpg`} download={`zalog-${slug(wall.name)}.jpg`}>Shrani sliko</a>
+          </figcaption>
+        </figure>
+        <div class="info">
+          <h2>{wall.name}</h2>
+          <ol>
+            {wall.problems.map(p => {
+              const key = id(p, wall)
+              return (
+                <li id={`p-${key}`} data-id={key} data-b={bucket(p.grade)} data-variant={p.num ? undefined : ''} data-named={p.name ? '' : undefined}
+                    data-text={[p.num, p.name, p.note, p.grade, wall.name].filter(Boolean).join(' ').toLowerCase()}
+                    class={band(p.grade)} tabindex={p.line ? 0 : undefined}>
+                  {p.num ? <span class="num">{p.num}</span> : <span class="var" title="varianta">↳</span>}
+                  <div class="txt">
+                    <b class={p.name ? '' : 'unnamed'}>{p.name ?? 'brez imena'}</b>
+                    {p.note && <p>{p.note}</p>}
+                  </div>
+                  <span class="grade">{p.grade ?? '—'}</span>
+                  <span class="ticks">
+                    <button type="button" class="t done" data-t="done" aria-pressed="false" title="Opravljeno"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></button>
+                    <button type="button" class="t proj" data-t="proj" aria-pressed="false" title="Projekt"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.9 6.7 19.9l1.2-6L3.4 9.8l6-.7z"/></svg></button>
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+        </div>
+      </section>
+    ))}
+    <p class="empty" hidden>Nič ne ustreza filtrom. <button type="button" class="link" onclick="document.getElementById('filters').reset()">Počisti filtre</button></p>
+  </main>
+
+  <section class="place" id="kraj">
+    <div class="cols">
+      <div>
+        <p class="kicker">O kraju</p>
+        <h2>Iz kamnoloma so prihajali mlinski kamni</h2>
+        <p>Kamnolom leži na južnem pobočju pod Starim gradom (Stari Osterberg) nad Podgradom pri Ljubljani, na približno 390 m. Prvič je omenjen leta 1567, kamen pa so tu najbrž lomili že Rimljani. Iz sten so klesali surove kolute, približno meter v premeru in četrt metra debele, jih spuščali v dolino Knapovska draga, tam dokončali in prodajali po vsej Kranjski.</p>
+        <p>Kamen je drobnozrnat kremenov peščenjak. Iz njega so delali »črne« mlinske kamne za moko za temni kruh. Danes je to največji in najbolje ohranjen kamnolom mlinskih kamnov v Sloveniji, od leta 2006 je kulturni spomenik lokalnega pomena. V stenah so še nedokončani kamni.</p>
+        <div class="etiq">
+          <h3>Ker je to spomenik</h3>
+          <ul>
+            <li>Ne klesaj in ne čisti stene z orodjem. Krtača je dovolj.</li>
+            <li>Ne plezaj po nedokončanih mlinskih kamnih in jih ne premikaj.</li>
+            <li>Ko greš, pobriši magnezijo in odnesi smeti.</li>
+            <li>Moker peščenjak je mehkejši in grifi se lomijo. Počakaj, da se posuši.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="access">
+        <p class="kicker">Dostop</p>
+        <dl>
+          <dt>Parkirišče</dt>
+          <dd><code>{parking}</code> <a href={osm(parking)}>OSM</a> <a href={`https://www.google.com/maps?q=${parking}`}>Google</a></dd>
+          <dt>Kamnolom</dt>
+          <dd><code>{quarry}</code> <a href={osm(quarry)}>OSM</a> <a href={`https://www.google.com/maps/dir/?api=1&destination=${quarry}&travelmode=walking`}>Pot peš</a></dd>
+          <dt>Pot</dt>
+          <dd>Od parkirišča je kamnolom približno 350 m zračne črte proti jugozahodu, navkreber nad dolino Besnice. Mimo poteka označena Ostrovrharjeva pot. Pobočje je strmo in zna biti spolzko, palice pridejo prav.</dd>
+        </dl>
+        <p class="src">Viri: <a href="https://www.podgrad-lj.si/znamenitosti/kamnolom-mlinskih-kamnov/">podgrad-lj.si</a>, <a href="https://www.hribi.net/gora/kamnolom_mlinskih_kamnov/25/3397">hribi.net</a></p>
+      </div>
+    </div>
   </section>
 
-  {walls.map(wall => (
-    <section class="wall">
-      <a href={wall.photo.src}>
-        <Image src={wall.photo} alt={`Stena ${wall.name} z vrisanimi linijami`} width={1200} widths={[600, 1200]} quality={60} sizes="(max-width: 760px) 100vw, 45vw" />
-      </a>
-      <div>
-        <h2>{wall.name}</h2>
-        <a class="save" href={`/topo/${slug(wall.name)}.jpg`} download={`zalog-${slug(wall.name)}.jpg`}>Shrani sliko</a>
-        <ol>
-          {wall.problems.map(p => (
-            <li class={p.num ? '' : 'variant'}>
-              {p.num && <span class="num">{p.num}</span>}
-              <div>
-                <b class={p.name ? '' : 'unnamed'}>{p.name ?? 'brez imena'}</b>
-                {p.note && <p>{p.note}</p>}
-              </div>
-              {p.grade && <span class={`grade ${band(p.grade)}`}>{p.grade}</span>}
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
-  ))}
+  <footer>
+    <img src="/icon.svg" alt="" width="36" height="36" />
+    <p>Ocene so po Fontainebleau lestvici. Barve: <span class="k easy">do 6c</span> <span class="k mid">7a–7b+</span> <span class="k hard">7c–8a</span> <span class="k max">8a+ in več</span>. Ko stran enkrat odpreš, deluje tudi brez signala. Tvoj seznam opravljenih ostane samo na tem telefonu.</p>
+  </footer>
 
-  <footer>Ocene so po Fontainebleau lestvici. Ko stran enkrat odpreš, deluje tudi brez signala.</footer>
+  <dialog id="zoom"><button class="close" type="button" aria-label="Zapri">×</button><div class="zbody"></div></dialog>
+  <div id="toast" hidden><span></span><button type="button"></button></div>
 
   <script>
+    const $ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => r.querySelector<T>(s)!
+    const $$ = <T extends Element = HTMLElement>(s: string, r: ParentNode = document) => [...r.querySelectorAll<T>(s)]
+    const form = $<HTMLFormElement>('#filters')
+    const items = $$<HTMLLIElement>('li[data-id]')
+    const LS = 'zalog:ticks'
+    let ticks: Record<string, 'done' | 'proj'> = {}
+    try { ticks = JSON.parse(localStorage.getItem(LS) || '{}') } catch {}
+
+    const lines = (id: string) => $$(`.topo [data-id="${CSS.escape(id)}"]`)
+
+    // ---- Ticks: opravljeno / projekt, kept on this device
+    const paintTicks = () => {
+      for (const li of items) {
+        const t = ticks[li.dataset.id!]
+        li.dataset.tick = t ?? ''
+        $$<HTMLButtonElement>('.t', li).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.t === t)))
+      }
+      const done = items.filter(li => ticks[li.dataset.id!] === 'done')
+      const proj = items.filter(li => ticks[li.dataset.id!] === 'proj').length
+      const best = done.map(li => li.querySelector('.grade')!.textContent!).filter(g => /^\d/.test(g)).sort().pop()
+      $('#log').textContent = done.length || proj
+        ? `Opravljeno ${done.length}/${items.length}${best ? `, najtežje ${best}` : ''}${proj ? ` · projekti: ${proj}` : ''}`
+        : 'Kljukaj ✓ za opravljene in ☆ za projekte. Ostane na tem telefonu.'
+    }
+    document.addEventListener('click', e => {
+      const b = (e.target as Element).closest<HTMLButtonElement>('button.t')
+      if (!b) return
+      const id = b.closest('li')!.dataset.id!, t = b.dataset.t as 'done' | 'proj'
+      if (ticks[id] === t) delete ticks[id]; else ticks[id] = t
+      try { localStorage.setItem(LS, JSON.stringify(ticks)) } catch {}
+      paintTicks(); apply()
+    })
+
+    // ---- Filters
+    const apply = () => {
+      const f = new FormData(form)
+      const q = String(f.get('q') ?? '').trim().toLowerCase()
+      let lo = +f.get('lo')!, hi = +f.get('hi')!
+      if (lo > hi) [lo, hi] = [hi, lo]
+      const allRange = lo === 0 && hi === +(form.hi as HTMLInputElement).max
+      const tick = f.get('tick'), variants = f.has('variants'), named = f.has('named')
+      let n = 0, active = 0
+      for (const li of items) {
+        const b = +li.dataset.b!
+        const ok = (!q || li.dataset.text!.includes(q))
+          && (allRange || (b >= lo && b <= hi))
+          && (!tick || (tick === 'todo' ? ticks[li.dataset.id!] !== 'done' : ticks[li.dataset.id!] === tick))
+          && (variants || !('variant' in li.dataset))
+          && (!named || 'named' in li.dataset)
+        li.hidden = !ok
+        lines(li.dataset.id!).forEach(el => el.classList.toggle('off', !ok))
+        if (ok) n++
+      }
+      for (const w of $$('[data-wall]')) w.hidden = !$$('li[data-id]', w).some(li => !li.hidden)
+      $('.empty').hidden = n > 0
+      $$<HTMLElement>('.hist span').forEach(s => s.classList.toggle('in', +s.dataset.b! >= lo && +s.dataset.b! <= hi))
+      const bk = JSON.parse($('.hist').dataset.buckets!) as string[]
+      ;(form.range as HTMLOutputElement).value = allRange ? 'vse' : lo === hi ? bk[lo] : `${bk[lo]}–${bk[hi]}`
+      active = +!!q + +!allRange + +!!tick + +!variants + +named
+      $('#shown').textContent = `Prikazanih ${n} od ${items.length}`
+      const fc = $('.fcount'); fc.hidden = !active; fc.textContent = String(active)
+    }
+    form.addEventListener('input', apply)
+    form.addEventListener('reset', () => setTimeout(apply))
+
+    // Tap a histogram bar to pick just that grade, tap again to reset
+    $$<HTMLElement>('.hist span').forEach(s => s.onclick = () => {
+      const lo = form.lo as HTMLInputElement, hi = form.hi as HTMLInputElement, b = s.dataset.b!
+      if (lo.value === b && hi.value === b) { lo.value = '0'; hi.value = hi.max } else { lo.value = hi.value = b }
+      apply()
+    })
+
+    // ---- Select a problem: highlights its line, dims the rest
+    const select = (id: string | null, scroll?: 'topo' | 'list') => {
+      $$('.topo .on').forEach(el => el.classList.remove('on'))
+      $$('.topo.has-on').forEach(el => el.classList.remove('has-on'))
+      items.forEach(li => li.classList.toggle('sel', li.dataset.id === id))
+      if (!id) return history.replaceState(null, '', location.pathname)
+      const els = lines(id)
+      els.forEach(el => { el.classList.add('on'); el.closest('.topo')!.classList.add('has-on') })
+      history.replaceState(null, '', '#p-' + id)
+      const target = scroll === 'topo' ? els[0]?.closest('.ph') : scroll === 'list' ? $(`#p-${CSS.escape(id)}`) : null
+      if (target) {
+        const r = target.getBoundingClientRect()
+        if (r.top < 120 || r.bottom > innerHeight) target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+    for (const li of items) {
+      li.addEventListener('click', e => {
+        if ((e.target as Element).closest('button')) return
+        select(li.classList.contains('sel') ? null : li.dataset.id!, 'topo')
+      })
+      li.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.click() } })
+    }
+    document.addEventListener('click', e => {
+      const g = (e.target as Element).closest<SVGGElement>('.topo [data-id]')
+      if (g && !g.closest('dialog')) select(g.classList.contains('on') ? null : g.dataset.id!, 'list')
+    })
+    if (location.hash.startsWith('#p-')) select(decodeURIComponent(location.hash.slice(3)), 'list')
+
+    // ---- Filter panel toggle (mobile)
+    const tg = $('.ftoggle')
+    tg.onclick = () => { const o = tg.getAttribute('aria-expanded') !== 'true'; tg.setAttribute('aria-expanded', String(o)); document.body.classList.toggle('fopen', o) }
+
+    // ---- Zoom: the topo full screen, pinch to zoom
+    const dlg = $<HTMLDialogElement>('#zoom')
+    $$('.zoom').forEach(b => b.onclick = () => {
+      const ph = b.closest('figure')!.querySelector('.ph')!.cloneNode(true) as HTMLElement
+      ph.querySelector('img')!.sizes = '100vw'
+      $('.zbody', dlg).replaceChildren(ph); dlg.showModal()
+    })
+    $('.close', dlg).onclick = () => dlg.close()
+    dlg.onclick = e => { if (e.target === dlg) dlg.close() }
+
+    // ---- PWA: offline pill, install button, update toast
+    const net = $('#net'), setNet = () => { net.hidden = navigator.onLine }
+    addEventListener('online', setNet); addEventListener('offline', setNet); setNet()
+
+    let deferred: any
+    const inst = $<HTMLButtonElement>('#install')
+    addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; inst.hidden = false })
+    inst.onclick = async () => { deferred?.prompt(); await deferred?.userChoice; deferred = null; inst.hidden = true }
+    addEventListener('appinstalled', () => { inst.hidden = true })
+
+    const toast = (msg: string, label: string, act: () => void) => {
+      const t = $('#toast'); $('span', t).textContent = msg
+      const b = $<HTMLButtonElement>('button', t); b.textContent = label; b.onclick = act; t.hidden = false
+    }
+    if ('serviceWorker' in navigator) {
+      const hadController = !!navigator.serviceWorker.controller
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const sw = reg.installing!
+          sw.addEventListener('statechange', () => {
+            if (sw.state === 'installed' && hadController) toast('Vodniček ima novo verzijo.', 'Osveži', () => sw.postMessage('skip'))
+            if (sw.state === 'activated' && !hadController) {
+              toast('Shranjeno za uporabo brez signala.', 'V redu', () => ($('#toast').hidden = true))
+              setTimeout(() => ($('#toast').hidden = true), 6000)
+            }
+          })
+        })
+      })
+      let reloading = false
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloading) { reloading = true; location.reload() } })
+    }
+
     // On phones a plain download lands in Files, the share sheet has "Save Image" which goes to the gallery
     const phone = matchMedia('(pointer: coarse)').matches
       && navigator.canShare?.({ files: [new File([''], 'x.jpg', { type: 'image/jpeg' })] })
-    if (phone) document.querySelectorAll<HTMLAnchorElement>('a[download]').forEach(a => a.onclick = async e => {
+    if (phone) $$<HTMLAnchorElement>('a[download]').forEach(a => a.onclick = async e => {
       e.preventDefault()
       const blob = await fetch(a.href).then(r => r.blob())
       navigator.share({ files: [new File([blob], a.download, { type: blob.type })] }).catch(() => {})
     })
+
+    paintTicks(); apply()
   </script>
 </body>
 </html>
 
+
 <style is:global>
   :root {
-    --bg: #eef0ea; --fg: #1f2420; --muted: #5d665e; --line: #d3d8cf; --red: #e5322d;
-    --easy: #2f8a4c; --mid: #2c6bb3; --hard: #d97a10; --max: #8e1c3a;
+    --paper: #efece4; --card: #f7f5f0; --ink: #1d211e; --muted: #5f655d; --line: #d6d0c2; --stone: #d8cfbd;
+    --red: #e5322d; --kicker: #c4231e; --moss: #5b6b3a;
+    --easy: #2f9a54; --mid: #2f74c4; --hard: #e5850f; --max: #c0244c;
+    --display: 'Big Shoulders Display', Impact, sans-serif;
+    color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #161a17; --fg: #e6eae3; --muted: #9aa499; --line: #333b34; --red: #ff5a4f; color-scheme: dark; }
+    :root { --paper: #141815; --card: #1c211d; --ink: #ece8de; --muted: #9ea69b; --line: #2f3630; --stone: #3a3f38; --red: #ff5a4f; --kicker: #ff5a4f; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: 76px; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.55 'Public Sans', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+  h1, h2, h3 { font-family: var(--display); text-transform: uppercase; line-height: .92; margin: 0; letter-spacing: .005em; }
+  h2 { font-size: clamp(40px, 6vw, 56px); }
+  a { color: inherit; text-underline-offset: 3px; }
+  button { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+  .kicker { margin: 0 0 10px; color: var(--kicker); font: 600 13px/1.2 'Public Sans', sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+  .kicker s { text-decoration-thickness: 2px; }
+  code { padding: 2px 6px; border-radius: 4px; background: var(--line); font-size: 14px; }
+
+  /* Hero */
+  .hero { position: relative; overflow: hidden; color: #f1ede3; background: #1d211e; }
+  .hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 25%; opacity: .42; filter: saturate(.7) contrast(1.05); }
+  .hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,24,21,.35), rgba(20,24,21,.15) 40%, rgba(20,24,21,.95)); }
+  .hero-in { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 20px 36px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: clamp(48px, 12vw, 120px); }
+  .logo { width: clamp(150px, 30vw, 226px); height: auto; display: block; }
+  .pill { padding: 5px 10px; border-radius: 99px; background: #e5850f; color: #1d211e; font-size: 12px; font-weight: 600; }
+  .hero .kicker { color: #ff7a6f; }
+  .hero h1 { font-size: clamp(60px, 13vw, 148px); font-weight: 900; }
+  .lede { max-width: 58ch; color: inherit; opacity: .85; font-size: 17px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px 28px; padding: 0; margin: 24px 0; list-style: none; font-size: 14px; opacity: .9; }
+  .stats b { display: block; font: 800 34px/1 var(--display); }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  .btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border: 1.5px solid currentColor; border-radius: 999px; background: none; font-weight: 600; font-size: 15px; text-decoration: none; cursor: pointer; }
+  .btn.solid { background: #f1ede3; color: #1d211e; border-color: #f1ede3; }
+  .btn:hover { background: #f1ede3; color: #1d211e; }
+
+  /* Sticky bar + filters */
+  .bar { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+  .bar-in { display: flex; align-items: center; gap: 12px; max-width: 1200px; margin: 0 auto; padding: 10px 20px; }
+  .jump { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; mask-image: linear-gradient(90deg, #000 90%, transparent); }
+  .jump::-webkit-scrollbar { display: none; }
+  .jump a { flex: none; padding: 6px 12px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font: 800 17px/1.1 var(--display); text-transform: uppercase; text-decoration: none; }
+  .jump a:hover { border-color: var(--ink); }
+  .ftoggle { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 38px; padding: 0 14px; border: 1.5px solid var(--ink); border-radius: 999px; background: var(--ink); color: var(--paper); font-weight: 600; font-size: 14px; cursor: pointer; }
+  .fcount { min-width: 20px; height: 20px; border-radius: 10px; background: var(--red); color: #fff; font-size: 12px; line-height: 20px; text-align: center; }
+  .filters { display: none; grid-template-columns: 1fr; gap: 14px 28px; max-width: 1200px; margin: 0 auto; padding: 4px 20px 16px; }
+  .fopen .filters { display: grid; }
+  .fopen .ftoggle { background: none; color: var(--ink); }
+  .fopen .bar { background: var(--paper); max-height: 100dvh; overflow-y: auto; box-shadow: 0 12px 30px rgba(0,0,0,.12); }
+  fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+  legend { padding: 0; margin-bottom: 6px; font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  legend output { margin-left: 6px; color: var(--ink); letter-spacing: 0; text-transform: none; font-size: 14px; }
+  .search { display: flex; align-items: center; gap: 8px; padding: 0 14px; min-height: 44px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--card); color: var(--muted); }
+  .search:focus-within { border-color: var(--ink); }
+  .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--ink); font: inherit; }
+  .hist { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; align-items: end; height: 70px; }
+  .hist span { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; cursor: pointer; }
+  .hist i { display: block; height: max(3px, calc(var(--h) * 48px)); border-radius: 3px 3px 0 0; background: var(--line); transition: background .15s; }
+  .hist span.in i { background: var(--ink); }
+  .hist span[data-b="0"].in i, .hist span[data-b="1"].in i, .hist span[data-b="2"].in i, .hist span[data-b="3"].in i { background: var(--easy); }
+  .hist span[data-b="4"].in i, .hist span[data-b="5"].in i { background: var(--mid); }
+  .hist span[data-b="6"].in i, .hist span[data-b="7"].in i { background: var(--hard); }
+  .hist span[data-b="8"].in i, .hist span[data-b="9"].in i { background: var(--max); }
+  .hist em { margin-top: 4px; font: normal 600 11px/1 'Public Sans', sans-serif; text-align: center; color: var(--muted); }
+  .dual { position: relative; height: 28px; margin: 0 calc(5% - 11px); }
+  .dual input { position: absolute; inset: 0; width: 100%; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+  .dual input::-webkit-slider-runnable-track { height: 4px; background: transparent; }
+  .dual::before { content: ''; position: absolute; left: 11px; right: 11px; top: 12px; height: 4px; border-radius: 2px; background: var(--line); }
+  .dual input::-webkit-slider-thumb { -webkit-appearance: none; pointer-events: auto; width: 22px; height: 22px; margin-top: -9px; border-radius: 50%; background: var(--paper); border: 3px solid var(--ink); cursor: grab; }
+  .dual input::-moz-range-thumb { pointer-events: auto; width: 16px; height: 16px; border-radius: 50%; background: var(--paper); border: 3px solid var(--ink); cursor: grab; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .seg legend { width: 100%; }
+  .seg label { position: relative; }
+  .seg input { position: absolute; opacity: 0; }
+  .seg span { display: inline-block; padding: 7px 13px; border: 1.5px solid var(--line); border-radius: 999px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .seg input:checked + span { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .seg input:focus-visible + span { outline: 2px solid var(--red); outline-offset: 2px; }
+  .summary, .log { margin: 0; font-size: 14px; color: var(--muted); }
+  .link { border: 0; background: none; padding: 0; text-decoration: underline; cursor: pointer; color: var(--ink); font-size: 14px; }
+  @media (min-width: 860px) {
+    .fopen .filters { grid-template-columns: 1.2fr 1.4fr 1fr; align-items: end; }
+    .search { grid-column: 1; grid-row: 1; }
+    .grades { grid-column: 2; grid-row: 1 / span 2; }
+    .seg:nth-of-type(2) { grid-column: 3; grid-row: 1; }
+    .seg:nth-of-type(3) { grid-column: 3; grid-row: 2; }
+    .summary { grid-column: 1; grid-row: 2; }
+    .log { grid-column: 1 / -1; }
   }
 
-  body { max-width: 1100px; margin: 0 auto; padding: 0 16px 48px; background: var(--bg); color: var(--fg); font: 15px/1.55 'Public Sans', system-ui, sans-serif; }
-  h1, h2 { font-family: 'Big Shoulders Display', Impact, sans-serif; text-transform: uppercase; line-height: 1; margin: 0; }
-  h1 { font-size: clamp(44px, 9vw, 88px); }
-  h2 { font-size: 36px; }
-  a { color: inherit; }
-  header { padding: 40px 0 24px; border-bottom: 3px solid var(--fg); }
-  header p { color: var(--muted); max-width: 60ch; }
-  .sub { font-size: 22px; margin: 6px 0 0; }
-  .sub s { text-decoration-color: var(--red); text-decoration-thickness: 3px; }
+  /* Walls */
+  main { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+  .wall { display: grid; grid-template-columns: 1fr; gap: 20px; padding: 36px 0; border-bottom: 3px solid var(--ink); }
+  @media (min-width: 860px) {
+    .wall { grid-template-columns: 6fr 5fr; gap: 40px; align-items: start; }
+    .topo-wrap { position: sticky; top: 76px; }
+    .topo-wrap .ph { width: min(100%, calc((100dvh - 150px) * var(--ar))); }
+  }
+  .topo-wrap { margin: 0; }
+  .ph { position: relative; border-radius: 10px; overflow: hidden; background: var(--stone); }
+  .ph img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .topo { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .topo .ln, .topo .bd { cursor: pointer; transition: opacity .2s; }
+  .topo .stroke, .topo .case { pointer-events: none; }
+  .topo .hit { pointer-events: stroke; }
+  .topo .off { display: none; }
+  .topo.has-on .ln:not(.on), .topo.has-on .bd:not(.on) { opacity: .22; }
+  .topo .ln.on .stroke { stroke-width: 10px; }
+  .topo .ln.on .case { stroke-width: 17px; }
+  .topo text { fill: #fff; font: 800 30px var(--display); text-anchor: middle; pointer-events: none; }
+  figcaption { display: flex; gap: 8px; margin-top: 10px; }
+  .mini { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border: 1.5px solid var(--line); border-radius: 999px; background: none; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; }
+  .mini:hover { border-color: var(--ink); }
 
-  .links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin: 12px 0 0; }
-  code { padding: 2px 6px; border-radius: 4px; background: var(--line); }
-  .save { display: inline-block; margin-top: 12px; padding: 6px 14px; border: 1.5px solid var(--fg); border-radius: 4px; background: none; color: var(--fg); font: 600 14px 'Public Sans', sans-serif; text-decoration: none; cursor: pointer; }
-  .save:hover { background: var(--fg); color: var(--bg); }
-  .approach, .wall { padding: 32px 0; border-bottom: 1px solid var(--line); }
-  .wall { display: grid; grid-template-columns: 5fr 6fr; gap: 32px; align-items: start; }
-  .wall img { width: 100%; height: auto; border-radius: 4px; }
-
-  ol { list-style: none; padding: 0; margin: 16px 0 0; }
-  li { display: grid; grid-template-columns: 40px 1fr auto; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
-  li.variant { grid-template-columns: 1fr auto; padding-left: 54px; }
-  li p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+  .info h2 { margin-bottom: 8px; }
+  ol { list-style: none; padding: 0; margin: 0; }
+  li[data-id] { display: grid; grid-template-columns: 38px 1fr auto; grid-template-areas: 'n t g' 'n t k'; gap: 2px 14px; padding: 14px 10px; margin: 0 -10px; border-top: 1px solid var(--line); border-radius: 8px; cursor: pointer; transition: background .15s; }
+  li[data-id]:hover { background: color-mix(in srgb, var(--card) 70%, transparent); }
+  li.sel { background: var(--card); box-shadow: inset 4px 0 0 var(--c, var(--red)); }
+  li.easy { --c: var(--easy); } li.mid { --c: var(--mid); } li.hard { --c: var(--hard); } li.max { --c: var(--max); } li.none { --c: var(--red); }
+  li.easy, li.hard, .k.easy, .k.hard { --on: #1d211e; }
+  li[data-variant] { cursor: default; }
+  li[data-tick="done"] .txt b { text-decoration: line-through; text-decoration-color: var(--c); text-decoration-thickness: 2px; }
+  .num { grid-area: n; width: 34px; height: 34px; border-radius: 50%; background: var(--c); color: var(--on, #fff); text-align: center; font: 800 19px/34px var(--display); box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--c); margin: 2px; }
+  .var { grid-area: n; justify-self: center; color: var(--muted); font-size: 20px; }
+  .txt { grid-area: t; min-width: 0; }
+  .txt p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
   .unnamed { font-weight: 400; font-style: italic; color: var(--muted); }
-  .num { width: 34px; height: 34px; border: 2.5px solid var(--red); border-radius: 50%; color: var(--red); text-align: center; font: 800 18px/29px 'Big Shoulders Display', sans-serif; }
-  .grade { align-self: start; min-width: 52px; padding: 5px 8px; border-radius: 4px; color: #fff; text-align: center; font-weight: 600; }
-  .easy { background: var(--easy); } .mid { background: var(--mid); } .hard { background: var(--hard); } .max { background: var(--max); }
-  .none { color: var(--muted); border: 1px dashed var(--line); }
+  .grade { grid-area: g; justify-self: end; min-width: 54px; padding: 3px 8px; border-radius: 6px; background: var(--c); color: var(--on, #fff); text-align: center; font-weight: 600; font-size: 15px; }
+  li.none .grade { background: none; color: var(--muted); border: 1.5px dashed var(--line); }
+  .ticks { grid-area: k; display: flex; gap: 4px; justify-content: flex-end; }
+  .t { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1.5px solid var(--line); border-radius: 50%; background: none; cursor: pointer; }
+  .t svg { width: 18px; height: 18px; fill: none; stroke: var(--muted); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .t.done[aria-pressed="true"] { background: var(--easy); border-color: var(--easy); }
+  .t.proj[aria-pressed="true"] { background: var(--hard); border-color: var(--hard); }
+  .t[aria-pressed="true"] svg { stroke: #fff; }
+  .t.proj[aria-pressed="true"] svg { fill: #fff; }
+  .empty { padding: 60px 0; text-align: center; color: var(--muted); }
 
-  footer { padding-top: 24px; color: var(--muted); font-size: 13px; }
+  /* Place */
+  /* Dark in both themes, the colours below assume it */
+  .place { margin-top: 56px; background: #1d211e; color: #efece4; }
+  .place .cols { display: grid; gap: 40px; max-width: 1200px; margin: 0 auto; padding: 56px 20px; }
+  @media (min-width: 860px) { .place .cols { grid-template-columns: 3fr 2fr; gap: 64px; } }
+  .place h2 { margin-bottom: 18px; max-width: 14ch; }
+  .place p { max-width: 62ch; opacity: .88; }
+  .place .kicker { color: #ff7a6f; }
+  .place code { background: rgba(255,255,255,.12); }
+  .etiq { margin-top: 28px; padding: 20px 22px; border: 1.5px solid color-mix(in srgb, currentColor 30%, transparent); border-radius: 12px; }
+  .etiq h3 { font-size: 26px; margin-bottom: 8px; }
+  .etiq ul { margin: 0; padding-left: 18px; }
+  .etiq li { margin: 4px 0; opacity: .9; }
+  dl { margin: 0; }
+  dt { margin-top: 18px; font: 800 22px/1 var(--display); text-transform: uppercase; }
+  dd { margin: 6px 0 0; opacity: .9; }
+  dd a { margin-left: 8px; font-weight: 600; }
+  .src { margin-top: 28px; font-size: 13px; opacity: .6 !important; }
 
-  @media (max-width: 760px) { .wall { grid-template-columns: 1fr; } }
+  footer { display: flex; gap: 16px; align-items: flex-start; max-width: 1200px; margin: 0 auto; padding: 32px 20px max(40px, env(safe-area-inset-bottom)); color: var(--muted); font-size: 14px; }
+  footer p { margin: 0; max-width: 72ch; }
+  .k { display: inline-block; padding: 0 6px; border-radius: 4px; color: var(--on, #fff); font-weight: 600; font-size: 13px; }
+  .k.easy { background: var(--easy); } .k.mid { background: var(--mid); } .k.hard { background: var(--hard); } .k.max { background: var(--max); }
 
-  /* Print / save as PDF: light colours, keep grade badges, one wall never split across pages */
+  /* Zoom dialog + toast */
+  dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #0d0f0e; }
+  dialog::backdrop { background: #0d0f0e; }
+  .zbody { width: 100%; height: 100%; overflow: auto; display: grid; place-items: center; }
+  .zbody .ph { width: min(100vw, calc(100dvh * var(--ar, .75))); border-radius: 0; }
+  .close { position: fixed; top: max(12px, env(safe-area-inset-top)); right: 12px; z-index: 2; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255,255,255,.16); color: #fff; font-size: 28px; line-height: 1; cursor: pointer; }
+  #toast { position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 20; transform: translateX(-50%); display: flex; gap: 14px; align-items: center; padding: 10px 10px 10px 18px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.25); white-space: nowrap; }
+  #toast button { border: 0; border-radius: 999px; padding: 6px 14px; background: var(--red); color: #fff; font-weight: 600; cursor: pointer; }
+
+  /* Print / save as PDF: light colours, one wall never split across pages */
   @page { margin: 12mm; }
   @media print {
-    :root { --bg: #fff; --fg: #000; --muted: #444; --line: #ccc; color-scheme: light; }
+    :root { --paper: #fff; --card: #fff; --ink: #000; --muted: #444; --line: #ccc; color-scheme: light; }
     * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    body { max-width: none; padding: 0; font-size: 12px; }
-    header { padding-top: 0; }
-    .links a, .save { display: none; }
-    .approach, .wall { padding: 16px 0; }
-    .wall { grid-template-columns: 5fr 6fr; gap: 20px; break-inside: avoid; }
-    li { padding: 6px 0; }
-    li p { font-size: 11px; }
+    body { font-size: 12px; }
+    .hero { background: #fff; color: #000; }
+    .hero-bg, .hero::after, .actions, .bar, figcaption, .ticks, #toast, dialog, .pill, .etiq { display: none !important; }
+    .logo { content: url(/logo.svg); }
+    .top { margin-bottom: 12px; }
+    .hero h1 { font-size: 56px; }
+    .hero .kicker, .place .kicker { color: var(--red); }
+    .wall { grid-template-columns: 6fr 5fr; gap: 20px; padding: 16px 0; break-inside: avoid; }
+    .topo-wrap { position: static; }
+    li[data-id] { padding: 6px 0; margin: 0; }
+    li[data-id][hidden], [data-wall][hidden] { display: grid !important; }
+    .place { background: #fff; color: #000; break-before: page; }
+    .place .cols { padding: 0; }
   }
 </style>
