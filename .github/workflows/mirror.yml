@@ -1,0 +1,16 @@
+name: mirror
+on:
+  push:
+    branches: [main]
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: |
+          git push --force \
+            "https://oauth2:${{ secrets.GITLAB_MIRROR_TOKEN }}@gitlab.alters.si/majal/zalog.alters.si.git" \
+            HEAD:refs/heads/main

@@ -1,0 +1,14 @@
+replicaCount: 2
+
+image:
+  repository: registry.alters.si/majal/zalog.alters.si
+  tag: ""
+
+host: zalog.alters.si
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    memory: 64Mi

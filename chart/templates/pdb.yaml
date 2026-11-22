@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "zalog-alters-si.fullname" . }}
+  labels:
+    {{- include "zalog-alters-si.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "zalog-alters-si.selectorLabels" . | nindent 6 }}
