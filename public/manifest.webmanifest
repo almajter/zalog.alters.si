@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "Kamnolom mlinskih kamnov · vodniček",
+  "short_name": "Zalog",
+  "description": "Nenatančen vodniček za balvane v kamnolomu mlinskih kamnov nad Podgradom. Deluje brez signala.",
+  "lang": "sl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1d211e",
+  "theme_color": "#1d211e",
+  "categories": ["sports", "travel"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Stene", "url": "/#stene" },
+    { "name": "Dostop", "url": "/#kraj" }
+  ]
+}
