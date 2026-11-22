@@ -16,8 +16,7 @@ npm run dev   # http://localhost:4321
 - `src/topo.ts`: draws the lines as SVG over the photo (smoothed curve, start
   bar, arrow, number badge, colour by grade). Used on the page and for the JPGs.
 - `src/photos/`: one clean photo per wall (no lines drawn in), named after the
-  wall (`Ne bor` → `ne-bor.jpg`). `src/photos/okolica/`: walls without lines yet,
-  not on the page.
+  wall (`Ne bor` → `ne-bor.jpg`).
 - `src/pages/topo/[slug].jpg.ts`: renders each wall as a JPG for the
   "Shrani sliko" button (lines composited with sharp, layout with Satori).
 - Filters (search, grade range, ticked/projects, variants) and the ✓/☆ list run
