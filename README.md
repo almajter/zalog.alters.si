@@ -32,4 +32,5 @@ npm run dev   # http://localhost:4321
 
 GitHub mirrors `main` to GitLab, GitLab CI builds the image (tag = short
 commit SHA) and publishes the chart in `chart/` (version `0.1.<pipeline>`).
-Deploy: bump the chart version in the homelab repo.
+Deploy: bump `version` in `kubernetes/apps/zalog-alters-si/config.yaml` in
+[almajter/homelab](https://github.com/almajter/homelab); Argo CD syncs it.
